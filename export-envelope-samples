@@ -1,0 +1,42 @@
+env = reaper.GetSelectedEnvelope(0)
+
+-- if an envelope track is selected, export the selected range
+if env then
+  -- get time selection
+  loop_start, loop_end = reaper.GetSet_LoopTimeRange(false, false, 0, 0, true)
+
+  -- get samplerate
+  retval, samplerate = reaper.GetAudioDeviceInfo("SRATE")
+  assert(retval)
+
+  proj_path = reaper.GetProjectPath()
+
+  -- generate name, watch out for unallowed chars, especially / 
+  retval, env_name = reaper.GetEnvelopeName(env)
+  track = reaper.Envelope_GetParentTrack(env)
+  retval, track_name = reaper.GetTrackName(track)
+  initial_file_name = track_name .. "_" .. env_name:gsub(" / ", "_") .. ".csv"
+
+  -- open file for writing
+  retval, filename = reaper.JS_Dialog_BrowseForSaveFile("Save", proj_path, initial_file_name, "*")
+
+  file = assert(io.open(filename, "w"))
+
+  -- iterate through selection
+  local time = loop_start
+  while time <= loop_end do
+    retval, automation = reaper.Envelope_Evaluate(env, time, samplerate, 1)
+    file:write(automation)
+    file:write("\n")
+    time = time + 1/samplerate
+  end
+
+  file:close()
+
+  reaper.ShowMessageBox(string.format("Automation exported to %s.\n", filename), "Export successful!", 0)
+
+else
+  reaper.ShowMessageBox("Please select an envelope.", "Error: No envelope selected", 0)
+
+end
+
